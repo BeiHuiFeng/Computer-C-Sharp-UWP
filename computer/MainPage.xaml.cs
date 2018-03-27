@@ -5,6 +5,8 @@ using System.Linq;
 using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
+using Windows.UI;
+using Windows.UI.ViewManagement;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Controls.Primitives;
@@ -14,7 +16,20 @@ using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Navigation;
 
 // https://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x804 上介绍了“空白页”项模板
-
+/* Error code:
+ * 0: operand mismatch
+ * 1: integer part miss in an operand
+ * 2: too more dot in a operand
+ * 3: unexpected character
+ * 4: 0 can't be used as divisor
+ * 5: parentheses missmatch
+ * 6: no expression in the innermost parentheses
+ * 7: in sqrt(x), x can't be negative
+ * 8: in ln(x), x can't be negative or 0
+ * 9: in fact(x), n can't be negative
+ * 10: in arcsin(x), x must between -1 and 1
+ * 11: in function arccos(x), x must between -1 and 1
+ */
 namespace computer {
     /// <summary>
     /// 可用于自身或导航至 Frame 内部的空白页。
@@ -24,9 +39,12 @@ namespace computer {
     class Expression {
         public string ExprStr {get; private set; }
         public string ResultStr { get; private set; }
+        public bool ExprLegit { get; private set; }        // is the expr legitimate?
+        // BtnChange = false: the button on the first line is x², ^, sin, cos, tan
+        // BtnChange = true: the button on the first line is x³, √, arcsin, arccos, arctan
+        public bool BtnChange { get; private set; }        
         private string CaculateStr;
         private bool haveCounted;        // initial value is false, when call func Count(), set it to true
-        private bool exprLegit;          // is the expr legitimate?
         private double result;
 
         private double CountWithoutParen(string str) {
@@ -62,18 +80,18 @@ namespace computer {
                                 i++;
                                 break;
                             }
-                            if (IsOP(expr[i])) {
-                                ResultStr = "ERROR:\nNo oprend matches " + expr[i].ToString();
-                                CaculateStr = "";
-                                exprLegit = false;
-                                return 0;
-                            }
                             if (expr[i] == '.') {
-                                ResultStr = "ERROR:\nNo digit befor dot.";
+                                ResultStr = "ERROR 1";
                                 CaculateStr = "";
-                                exprLegit = false;
+                                ExprLegit = false;
                                 return 0;
                             }
+                        }
+                        if (IsOP(expr[i])) {
+                            ResultStr = "ERROR 0";
+                            CaculateStr = "";
+                            ExprLegit = false;
+                            return 0;
                         }
                         state = 1;
                         i++;
@@ -86,9 +104,9 @@ namespace computer {
                             isDotExit = true;
                         }
                         else if(expr[i] == '.' && isDotExit) {
-                            ResultStr = "ERROR:\nTwo dot exit in a number.";
+                            ResultStr = "ERROR 2";
                             CaculateStr = "";
-                            exprLegit = false;
+                            ExprLegit = false;
                             return 0;
                         }
                         else if (IsOP(expr[i])) {
@@ -100,9 +118,9 @@ namespace computer {
                             // no need to i++
                         }
                         else {
-                            ResultStr = "ERROR:\nUnexpected character: " + expr[i].ToString();
+                            ResultStr = "ERROR 3" + expr[i].ToString();
                             CaculateStr = "";
-                            exprLegit = false;
+                            ExprLegit = false;
                             return 0;
                         }
                         break;
@@ -125,7 +143,7 @@ namespace computer {
                                     operandA = StackOPRD.Pop();
                                     op = StackOP.Pop();
                                     operand = Operate(operandA, op, operandB);
-                                    if (!exprLegit) return 0;
+                                    if (!ExprLegit) return 0;
                                     StackOPRD.Push(operand);
                                     break;
                                 default:
@@ -156,9 +174,9 @@ namespace computer {
                 case '^': return Math.Round(Math.Pow(operandA, operandB), 5);
                 case '÷':
                     if (operandB == 0) {
-                        ResultStr = "ERROR:\n0 can't be used as divisor.";
+                        ResultStr = "ERROR 4";
                         CaculateStr = "";
-                        exprLegit = false;
+                        ExprLegit = false;
                         return 0;
                     }
                     else return operandA / operandB;
@@ -258,9 +276,10 @@ namespace computer {
             */
             str = str.Replace("squa", "@").Replace("cube", "#");
             str = str.Replace("ln", "l").Replace("fact", "f").Replace("sqrt", "$");
-            str = str.Replace("sin", "s").Replace("cos", "c");
-            str = str.Replace("tan", "t").Replace("arcsin", "x");
+            str = str.Replace("arcsin", "x");
             str = str.Replace("arccos", "y").Replace("arctan", "z");
+            str = str.Replace("sin", "s").Replace("cos", "c");
+            str = str.Replace("tan", "t");
             return str;
         }
 
@@ -284,6 +303,8 @@ namespace computer {
         
         private bool IfAnyOP(string str) {
             char[] ops = { '+', '-', '×', '÷', '^' };
+            char[] c = str.ToCharArray();
+            if (c[0] == '-') str = str.Remove(0, 1);
             if (str.IndexOfAny(ops) < 0) return false;
             else return true;
         }
@@ -292,13 +313,19 @@ namespace computer {
             ExprStr = "";
             ResultStr = "";
             CaculateStr = "";
-            exprLegit = true;
+            ExprLegit = true;
             haveCounted = false;
+            BtnChange = false;
             result = 0;
         }
 
+        public void ChangeButton() {
+            if (BtnChange) BtnChange = false;
+            else BtnChange = true;
+        }
+
         public void Add(string BtnStr) {
-            exprLegit = true;
+            ExprLegit = true;
             if(haveCounted) {
                 haveCounted = false;
                 ExprStr = "";
@@ -308,18 +335,16 @@ namespace computer {
                 if (ExprStr.EndsWith("+") || ExprStr.EndsWith("-") || ExprStr.EndsWith("×") || ExprStr.EndsWith("÷"))
                     ExprStr = ExprStr.Remove(ExprStr.Length - 1);
             }
-            ExprStr = ExprStr + BtnStr;
-        }
-
-        public bool IsExprLegit() {
-            return exprLegit;
+            if (BtnStr == "squa" || BtnStr == "cube" || BtnStr == "fact")
+                ExprStr = BtnStr + "(" + ExprStr + ")";
+            else ExprStr = ExprStr + BtnStr;
         }
         
         public void Clear() {
             ExprStr = "";
             ResultStr = "";
             CaculateStr = "";
-            exprLegit = true;
+            ExprLegit = true;
             haveCounted = false;
             result = 0;
         }
@@ -351,7 +376,7 @@ namespace computer {
                         return;
                     }
                     result = CountWithoutParen(CaculateStr);
-                    if (!exprLegit) {
+                    if (!ExprLegit) {
                         // more code here
 
 
@@ -363,18 +388,18 @@ namespace computer {
                 }
                 else if ((LPIndex < 0 && RPIndex >= 0) || (LPIndex >= 0) && (RPIndex < 0)) {
                     // only find left or right parenthese
-                    ResultStr = "ERROR:\nCannot match parentheses.\nPlease check your input again.";
+                    ResultStr = "ERROR 5";
                     CaculateStr = "";
                     result = 0;
-                    exprLegit = false;
+                    ExprLegit = false;
                     return;
                 }
                 else if ((RPIndex - LPIndex) <= 1) {
                     // no expression in the couple of parentheses or wrong position of the two parenthese
-                    ResultStr = "ERROR:\nNo expr in innermost parentheses.";
+                    ResultStr = "ERROR 6";
                     CaculateStr = "";
                     result = 0;
-                    exprLegit = false;
+                    ExprLegit = false;
                     return;
                 }
                 else {
@@ -385,7 +410,7 @@ namespace computer {
                     if (IfAnyOP(tempStr)) {
                         // count the expression in the parentheses
                         tempResult = CountWithoutParen(tempStr);
-                        if (!exprLegit) {
+                        if (!ExprLegit) {
                             // maybe more code here
 
                             return;
@@ -407,13 +432,24 @@ namespace computer {
                             // cube
                             tempResult = tempResult * tempResult * tempResult;
                             break;
+                        case '$':
+                            // sqrt
+                            if(tempResult < 0) {
+                                ResultStr = "ERROR 7";
+                                CaculateStr = "";
+                                result = 0;
+                                ExprLegit = false;
+                                return;
+                            }
+                            tempResult = Math.Round(Math.Sqrt(tempResult), 5);
+                            break;
                         case 'l':
                             // ln
                             if(tempResult <= 0) {
-                                ResultStr = "ERROR:\nIn function ln(x), x can't be negative or 0.";
+                                ResultStr = "ERROR 8";
                                 CaculateStr = "";
                                 result = 0;
-                                exprLegit = false;
+                                ExprLegit = false;
                                 return;
                             }
                             tempResult = Math.Round(Math.Log(tempResult), 5);
@@ -421,10 +457,10 @@ namespace computer {
                         case 'f':
                             // factorial
                             if(tempResult < 0) {
-                                ResultStr = "ERROR:\nIn function fact(n), n can't be negative.";
+                                ResultStr = "ERROR 9";
                                 CaculateStr = "";
                                 result = 0;
-                                exprLegit = false;
+                                ExprLegit = false;
                                 return;
                             }
                             tempResult = Fact((int)tempResult);
@@ -444,10 +480,10 @@ namespace computer {
                         case 'x':
                             // arcsin
                             if(tempResult < -1 || tempResult > 1) {
-                                ResultStr = "ERROR:\nIn function arcsin(x), x must between -1 and 1.";
+                                ResultStr = "ERROR 10";
                                 CaculateStr = "";
                                 result = 0;
-                                exprLegit = false;
+                                ExprLegit = false;
                                 return;
                             }
                             tempResult = Math.Round(Math.Asin(tempResult), 5);
@@ -455,10 +491,10 @@ namespace computer {
                         case 'y':
                             // arccos
                             if (tempResult < -1 || tempResult > 1) {
-                                ResultStr = "ERROR:\nIn function arccos(x), x must between -1 and 1.";
+                                ResultStr = "ERROR 11";
                                 CaculateStr = "";
                                 result = 0;
-                                exprLegit = false;
+                                ExprLegit = false;
                                 return;
                             }
                             tempResult = Math.Round(Math.Acos(tempResult), 5);
@@ -491,6 +527,17 @@ namespace computer {
 
         public MainPage() {
             this.InitializeComponent();
+            var titleBar = ApplicationView.GetForCurrentView().TitleBar;
+            titleBar.BackgroundColor = Color.FromArgb(0xFF, 0xFF, 0xFF, 0xD0);
+            titleBar.ForegroundColor = Color.FromArgb(0xFF, 0xFF, 0xFF, 0xD0);
+            titleBar.InactiveBackgroundColor = Color.FromArgb(0xFF, 0xFF, 0xFF, 0xD0);
+            titleBar.InactiveForegroundColor = Color.FromArgb(0xFF, 0xFF, 0xFF, 0xD0);
+
+            // button in titile
+            titleBar.ButtonBackgroundColor = titleBar.ButtonInactiveBackgroundColor = Color.FromArgb(0xFF, 0xFF, 0xFF, 0xD0);
+            titleBar.ButtonHoverBackgroundColor = Color.FromArgb(0xFF, 0xEF, 0xEF, 0xB0);
+            titleBar.ButtonPressedBackgroundColor = Color.FromArgb(0xFF, 0xDF, 0xDF, 0x90);
+            titleBar.ButtonForegroundColor = titleBar.ButtonHoverForegroundColor = titleBar.ButtonInactiveForegroundColor = titleBar.ButtonPressedForegroundColor = Colors.Black; 
         }
 
         Expression expr = new Expression();
@@ -502,17 +549,18 @@ namespace computer {
         }
 
         private void BtnClickSquare(object sender, RoutedEventArgs e) {
-            expr.Add("squa");
+            if (expr.BtnChange) expr.Add("cube");
+            else expr.Add("squa");
             TxtExpr.Text = expr.ExprStr;
         }
 
-        private void BtnClickCube(object sender, RoutedEventArgs e) {
+        /*private void BtnClickCube(object sender, RoutedEventArgs e) {
             expr.Add("cube");
             TxtExpr.Text = expr.ExprStr;
-        }
+        }*/
 
         private void BtnClickLn(object sender, RoutedEventArgs e) {
-            expr.Add("ln");
+            expr.Add("ln(");
             TxtExpr.Text = expr.ExprStr;
         }
 
@@ -537,19 +585,32 @@ namespace computer {
         }
 
         private void BtnClickPower(object sender, RoutedEventArgs e) {
-            expr.Add("^");
+            if(expr.BtnChange) expr.Add("sqrt(");
+            else expr.Add("^");
             TxtExpr.Text = expr.ExprStr;
         }
 
-        private void BtnClickSqrt(object sender, RoutedEventArgs e) {
-            expr.Add("sqrt");
+        /*private void BtnClickSqrt(object sender, RoutedEventArgs e) {
+            expr.Add("sqrt(");
             TxtExpr.Text = expr.ExprStr;
-        }
+        }*/
 
-        private void BtnClickClearAll(object sender, RoutedEventArgs e) {
-            expr.Clear();
-            TxtExpr.Text = expr.ExprStr;
-            TxtResult.Text = expr.ResultStr;
+        private void BtnClickChange(object sender, RoutedEventArgs e) {
+            expr.ChangeButton();
+            if(expr.BtnChange) {
+                BtnSquCube.Content = "x³";
+                BtnPowSqrt.Content = "√";
+                BtnSinAsin.Content = "arcsin";
+                BtnCosAcos.Content = "arccos";
+                BtnTanAtan.Content = "arctan";
+            }
+            else {
+                BtnSquCube.Content = "x²";
+                BtnPowSqrt.Content = "^";
+                BtnSinAsin.Content = "sin";
+                BtnCosAcos.Content = "cos";
+                BtnTanAtan.Content = "tan";
+            }
         }
 
         private void BtnClickNum7(object sender, RoutedEventArgs e) {
@@ -573,13 +634,20 @@ namespace computer {
         }
 
         private void BtnClickSin(object sender, RoutedEventArgs e) {
-            expr.Add("sin");
+            if (expr.BtnChange) expr.Add("arcsin(");
+            else expr.Add("sin(");
             TxtExpr.Text = expr.ExprStr;
         }
 
-        private void BtnClickArcsin(object sender, RoutedEventArgs e) {
-            expr.Add("arcsin");
+        /*private void BtnClickArcsin(object sender, RoutedEventArgs e) {
+            expr.Add("arcsin(");
             TxtExpr.Text = expr.ExprStr;
+        }*/
+        
+        private void BtnClickClearAll(object sender, RoutedEventArgs e) {
+            expr.Clear();
+            TxtExpr.Text = expr.ExprStr;
+            TxtResult.Text = expr.ResultStr;
         }
 
         private void BtnClickNum8(object sender, RoutedEventArgs e) {
@@ -603,14 +671,15 @@ namespace computer {
         }
 
         private void BtnClickCos(object sender, RoutedEventArgs e) {
-            expr.Add("cos");
+            if (expr.BtnChange) expr.Add("arccos(");
+            else expr.Add("cos(");
             TxtExpr.Text = expr.ExprStr;
         }
 
-        private void BtnClickArccos(object sender, RoutedEventArgs e) {
-            expr.Add("arccos");
+        /*private void BtnClickArccos(object sender, RoutedEventArgs e) {
+            expr.Add("arccos(");
             TxtExpr.Text = expr.ExprStr;
-        }
+        }*/
 
         private void BtnClickBack(object sender, RoutedEventArgs e) {
             expr.BackSpace();
@@ -638,14 +707,15 @@ namespace computer {
         }
 
         private void BtnClickTan(object sender, RoutedEventArgs e) {
-            expr.Add("tan");
+            if (expr.BtnChange) expr.Add("arctan(");
+            else expr.Add("tan(");
             TxtExpr.Text = expr.ExprStr;
         }
 
-        private void BtnClickArctan(object sender, RoutedEventArgs e) {
-            expr.Add("arctan");
+        /*private void BtnClickArctan(object sender, RoutedEventArgs e) {
+            expr.Add("arctan(");
             TxtExpr.Text = expr.ExprStr;
-        }
+        }*/
 
         private void BtnClickDiv(object sender, RoutedEventArgs e) {
             expr.Add("÷");

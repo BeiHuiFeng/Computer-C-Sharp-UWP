@@ -107,6 +107,9 @@
     <None Include="computer_TemporaryKey.pfx" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="Assets\Back.png" />
+    <Content Include="Assets\rowUp.png" />
+    <Content Include="Assets\upRow.png" />
     <Content Include="Properties\Default.rd.xml" />
     <Content Include="Assets\LockScreenLogo.scale-200.png" />
     <Content Include="Assets\SplashScreen.scale-200.png" />
