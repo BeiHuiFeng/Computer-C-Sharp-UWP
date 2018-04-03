@@ -75,11 +75,7 @@ namespace computer {
                         operandSPos = i;
                         isDotExit = false;
                         if (char.IsLetter(expr[i])) {
-                            if (expr[i] == '-') {
-                                state = 1;
-                                i++;
-                                break;
-                            }
+                            
                             if (expr[i] == '.') {
                                 ResultStr = "ERROR 1";
                                 CaculateStr = "";
@@ -88,6 +84,11 @@ namespace computer {
                             }
                         }
                         if (IsOP(expr[i])) {
+                            if (expr[i] == '-') {
+                                state = 1;
+                                i++;
+                                break;
+                            }
                             ResultStr = "ERROR 0";
                             CaculateStr = "";
                             ExprLegit = false;
